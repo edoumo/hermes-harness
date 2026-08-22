@@ -43,8 +43,6 @@ def test_models_panel_uses_hermes_as_single_source_of_truth():
     assert 'provider: "auto"' in models
     assert 'confirm_expensive_model: true' in models
 
-    # Browser code must not own provider credentials or persist a parallel
-    # model configuration.
     forbidden = (
         "Authorization",
         "Bearer ",
@@ -79,8 +77,6 @@ def test_models_asset_is_loaded_after_existing_h6_stack():
     assert "h63.src='/harness-polish3.js'" in recovery_source
     assert "hm.src='/harness-models.js'" in recovery_source
     assert recovery_source.index("h63.src='/harness-polish3.js'") < recovery_source.index("hm.src='/harness-models.js'")
-    # Asset ownership lives in the H6 recovery/static layer; the standalone
-    # HTTP server delegates static resolution instead of duplicating paths.
     assert '"/harness-models.js": "harness-models.js"' in recovery_source
 
 
@@ -94,7 +90,6 @@ def test_existing_harness_archive_remains_browser_local_masking():
     assert "localStorage" in preferences
     assert "Hermes session data is not deleted" in locales
 
-    # The model lot is deliberately orthogonal to archive/purge lifecycle.
     assert "setSessionArchived" not in models
     assert "/archive" not in models
     assert "/delete" not in models

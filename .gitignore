@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local runtime state (never commit passwords/state)
+.webui_password
+state/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editors / agents
+.vscode/
+.idea/
+*.swp
+*.swo
+.claude/
+AGENTS.local.md
+.pytest_cache/

@@ -49,6 +49,12 @@ def test_copy_fallback_does_not_require_secure_context_or_backend():
 def test_message_timestamp_and_status_coexist():
     harness = _static("harness.js")
 
+    # There must be exactly one effective renderer. A duplicate declaration
+    # later in the classic script would silently override the richer renderer
+    # while string-presence checks still passed.
+    assert harness.count("function eventNode(") == 1
+    assert harness.count("function formatTime(") == 1
+
     # eventNode renders BOTH the state label and the formatted timestamp when
     # both are available (previously the header showed only one of them).
     assert "stateName" in harness

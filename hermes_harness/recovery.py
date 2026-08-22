@@ -1,7 +1,10 @@
 """H5 recovery plus H6.1/H6.2/H6.3 human-UAT polish extensions for Harness."""
 from __future__ import annotations
 
+import json
 import re
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
@@ -97,9 +100,75 @@ def resolve_upstream(method: str, browser_path: str) -> Optional[str]:
     return tasks.resolve_upstream(method, browser_path)
 
 
+def _proxy_session_rename(handler, parsed) -> bool:
+    """Proxy only the title subset of Hermes' broader SessionRename model.
+
+    Hermes' canonical rename model can carry other session metadata on some
+    runtimes. Harness deliberately exposes a rename-only affordance here so a
+    caller cannot smuggle durable archive or other lifecycle mutations through
+    a UI route whose contract is only "rename".
+    """
+    if parsed.query:
+        j(handler, {"error": "Session rename does not accept query parameters"}, status=400)
+        return True
+    try:
+        raw = foundation._read_json_body(handler)
+        payload = json.loads(raw.decode("utf-8"))
+    except foundation.HarnessConfigError as exc:
+        j(handler, {"error": str(exc)}, status=400)
+        return True
+
+    if set(payload) - {"session_id", "title"}:
+        j(handler, {"error": "Session rename accepts only session_id and title"}, status=400)
+        return True
+    session_id = payload.get("session_id")
+    title = payload.get("title")
+    if not isinstance(session_id, str) or re.fullmatch(_SAFE_ID, session_id) is None:
+        j(handler, {"error": "Invalid session_id"}, status=400)
+        return True
+    if not isinstance(title, str) or not title.strip() or len(title.strip()) > 160:
+        j(handler, {"error": "Session title must contain 1 to 160 characters"}, status=400)
+        return True
+
+    body = json.dumps(
+        {"session_id": session_id, "title": title.strip()},
+        separators=(",", ":"),
+    ).encode("utf-8")
+    try:
+        request = urllib.request.Request(
+            f"{foundation._gateway_base_url()}/api/session/rename",
+            data=body,
+            headers={
+                "Authorization": "Bearer " + foundation._gateway_api_key(),
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "User-Agent": "Hermes-Harness/0.2",
+            },
+            method="POST",
+        )
+        try:
+            response = foundation._OPENER.open(request, timeout=foundation._NORMAL_TIMEOUT_SECONDS)
+        except urllib.error.HTTPError as exc:
+            data = foundation._read_bounded_response(exc)
+            foundation._send_bytes(handler, exc.code, data, exc.headers)
+            return True
+        with response:
+            data = foundation._read_bounded_response(response)
+            foundation._send_bytes(handler, response.status, data, response.headers)
+            return True
+    except foundation.HarnessConfigError as exc:
+        j(handler, {"error": str(exc), "code": "harness_configuration"}, status=503)
+        return True
+    except (urllib.error.URLError, TimeoutError, OSError):
+        j(handler, {"error": "Hermes API is unavailable", "code": "harness_upstream_unavailable"}, status=502)
+        return True
+
+
 def handle_harness_request(handler, parsed, *, method: str) -> bool:
     if not foundation.harness_enabled():
         return False
+    if method == "POST" and parsed.path == "/api/harness/session-rename":
+        return _proxy_session_rename(handler, parsed)
     upstream = resolve_upstream(method, parsed.path)
     inherited = tasks.resolve_upstream(method, parsed.path)
     if upstream is None:

@@ -188,16 +188,15 @@ function h63InstallDagStyles() {
   style.id = "h63DagStyle";
   style.textContent = `
     .h5-dag-canvas.h63-single-stage{overflow-x:hidden!important;scrollbar-gutter:auto!important;width:100%;max-width:100%}
-    .h5-dag-canvas.h63-single-stage .h5-dag-levels{grid-auto-flow:row!important;grid-template-columns:minmax(0,1fr)!important;grid-auto-columns:auto!important;width:100%!important;min-width:0!important;max-width:100%!important}
-    .h5-dag-canvas.h63-single-stage .h5-dag-level{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem;width:100%;min-width:0;max-width:100%}
-    .h5-dag-canvas.h63-single-stage .h5-level-label{grid-column:1/-1}
+    .h5-dag-canvas.h63-single-stage .h5-dag-levels{display:block!important;width:100%!important;min-width:0!important;max-width:100%!important}
+    .h5-dag-canvas.h63-single-stage .h5-dag-level{display:block!important;width:100%!important;min-width:0!important;max-width:100%!important}
+    .h5-dag-canvas.h63-single-stage .h5-dag-level-title{margin-bottom:.75rem}
+    .h5-dag-canvas.h63-single-stage .h5-dag-group{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem;width:100%!important;min-width:0!important;max-width:none!important}
     .h5-dag-canvas.h63-single-stage .h5-task-node{width:100%;min-width:0;max-width:100%}
-    .h5-dag-canvas.h63-single-stage.h63-hide-completed .h5-task-node[data-h5-status="completed"]{display:none!important}
+    .h5-dag-canvas.h63-single-stage .h5-task-node[hidden]{display:none!important}
     .h63-task-dictation-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
     .h63-task-dictation-btn{min-width:40px;flex:0 0 auto}
     .h63-task-dictation-btn.h63-listening{border-color:var(--danger);color:var(--danger)}
-    @media(max-width:1500px){.h5-dag-canvas.h63-single-stage .h5-dag-level{grid-template-columns:repeat(2,minmax(0,1fr))}}
-    @media(max-width:900px){.h5-dag-canvas.h63-single-stage .h5-dag-level{grid-template-columns:minmax(0,1fr)}}
   `;
   document.head.appendChild(style);
 }
@@ -220,25 +219,47 @@ function h63InstallTaskHistoryControl() {
   button.id = "h63CompletedTasksToggle";
   button.type = "button";
   button.addEventListener("click", () => {
-    const canvas = $("taskList")?.querySelector(".h5-dag-canvas");
-    const next = !(canvas?.classList.contains("h63-hide-completed"));
-    h63WriteHideCompleted(next);
+    h63WriteHideCompleted(!h63ReadHideCompleted());
     h63NormalizeDag();
   });
   const newTask = $("newTaskBtn");
   head.insertBefore(button, newTask || null);
 }
 
+function h63SyncRenderedTaskStatus(canvas) {
+  const tasks = new Map((Array.isArray(state.h5Graph?.tasks) ? state.h5Graph.tasks : []).map((task) => [String(task?.task_id || ""), task]));
+  for (const node of canvas?.querySelectorAll(".h5-task-node") || []) {
+    const task = tasks.get(String(node.dataset.h5TaskId || ""));
+    if (task) node.dataset.h5Status = String(task.status || "");
+  }
+}
+
 function h63UpdateTaskHistoryControl(canvas, singleStage) {
   const button = $("h63CompletedTasksToggle");
-  if (!button) return;
   const tasks = Array.isArray(state.h5Graph?.tasks) ? state.h5Graph.tasks : [];
   const completed = tasks.filter((task) => task?.status === "completed").length;
   const hidden = singleStage && completed > 0 && h63ReadHideCompleted();
   canvas?.classList.toggle("h63-hide-completed", hidden);
-  button.hidden = !singleStage || completed === 0;
-  button.textContent = `${h63TaskText(hidden ? "showDone" : "hideDone")} (${completed})`;
-  button.setAttribute("aria-pressed", String(!hidden));
+  for (const node of canvas?.querySelectorAll(".h5-task-node") || []) {
+    node.hidden = hidden && node.dataset.h5Status === "completed";
+  }
+  if (button) {
+    button.hidden = !singleStage || completed === 0;
+    button.textContent = `${h63TaskText(hidden ? "showDone" : "hideDone")} (${completed})`;
+    button.setAttribute("aria-pressed", String(!hidden));
+  }
+  return hidden;
+}
+
+function h63ApplySingleStageColumns(canvas, singleStage) {
+  if (!singleStage) return;
+  const group = canvas.querySelector(".h5-dag-level .h5-dag-group");
+  if (!group) return;
+  const visibleTasks = [...group.querySelectorAll(".h5-task-node")].filter((node) => !node.hidden).length;
+  const width = Math.max(canvas.clientWidth || 0, canvas.getBoundingClientRect?.().width || 0);
+  const responsiveCap = width && width <= 900 ? 1 : (width && width <= 1500 ? 2 : 3);
+  const columns = Math.max(1, Math.min(responsiveCap, visibleTasks || 1));
+  group.style.setProperty("grid-template-columns", `repeat(${columns},minmax(0,1fr))`, "important");
 }
 
 function h63NormalizeDag() {
@@ -247,7 +268,9 @@ function h63NormalizeDag() {
   const levels = canvas.querySelectorAll(".h5-dag-level");
   const singleStage = levels.length <= 1;
   canvas.classList.toggle("h63-single-stage", singleStage);
+  h63SyncRenderedTaskStatus(canvas);
   h63UpdateTaskHistoryControl(canvas, singleStage);
+  h63ApplySingleStageColumns(canvas, singleStage);
   if (singleStage || canvas.scrollWidth <= canvas.clientWidth + 1) canvas.scrollLeft = 0;
   requestAnimationFrame(() => {
     if (singleStage) canvas.scrollLeft = 0;
@@ -259,7 +282,7 @@ function h63ObserveTaskGraph() {
   const root = $("taskList");
   if (!root || root.__h63Observer) return;
   const observer = new MutationObserver(() => requestAnimationFrame(h63NormalizeDag));
-  observer.observe(root, { childList: true });
+  observer.observe(root, { childList: true, subtree: true });
   root.__h63Observer = observer;
 }
 

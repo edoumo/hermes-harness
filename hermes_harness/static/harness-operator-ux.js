@@ -1,8 +1,8 @@
 "use strict";
 
 // Operator UX layer: keeps the durable transcript primary, moves execution
-// diagnostics behind an explicit toggle, exposes existing rename controls, and
-// offers best-effort browser dictation without taking ownership of Hermes data.
+// diagnostics behind explicit controls, exposes rename actions, and offers
+// best-effort browser dictation without taking ownership of Hermes data.
 
 const OUX_PREFIX = "hermesHarness.ui.";
 const OUX_KEYS = Object.freeze({
@@ -175,8 +175,10 @@ function ouxButton(id, icon, label) {
   const button = el("button", "ghost oux-toggle");
   button.id = id;
   button.type = "button";
-  button.innerHTML = `<span class="oux-toggle-icon" aria-hidden="true">${icon}</span><span class="oux-toggle-label"></span>`;
-  button.querySelector(".oux-toggle-label").textContent = label;
+  const iconNode = el("span", "oux-toggle-icon", icon);
+  iconNode.setAttribute("aria-hidden", "true");
+  const textNode = el("span", "oux-toggle-label", label);
+  button.append(iconNode, textNode);
   button.setAttribute("aria-label", label);
   button.title = label;
   return button;
@@ -193,6 +195,7 @@ function ouxInstallStyles() {
     .oux-toggle{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
     .oux-toggle-icon{font-size:14px;line-height:1}
     .oux-toggle[aria-pressed="true"]{border-color:var(--accent);color:var(--text)}
+    .topbar .oux-focus-toggle{min-width:34px}
     .oux-activations-collapsed .activation-card{display:none!important}
     .oux-activations-collapsed .content-grid{grid-template-columns:minmax(0,1fr)!important}
     .oux-tasks-collapsed .tasks-card{display:none!important}
@@ -215,8 +218,8 @@ function ouxInstallStyles() {
     @media (max-width:1180px){
       .content-grid{grid-template-columns:minmax(0,1fr)!important}
       .activation-card{width:100%}
-      .oux-toggle-label{display:none}
-      .oux-toggle{width:32px;padding:0;justify-content:center}
+      .worker-header .oux-toggle-label{display:none}
+      .worker-header .oux-toggle{width:32px;padding:0;justify-content:center}
     }
     @media (max-width:760px){
       .worker-actions{gap:4px}
@@ -226,6 +229,14 @@ function ouxInstallStyles() {
     }
   `;
   document.head.appendChild(style);
+}
+
+function ouxSetButtonLabel(button, label) {
+  if (!button) return;
+  button.setAttribute("aria-label", label);
+  button.title = label;
+  const text = button.querySelector(".oux-toggle-label");
+  if (text) text.textContent = label;
 }
 
 function ouxApplyLayout() {
@@ -238,59 +249,55 @@ function ouxApplyLayout() {
 
   const executionButton = $("ouxExecutionToggle");
   if (executionButton) {
-    const label = ouxText(ouxState.activationsCollapsed ? "showExecutions" : "hideExecutions");
     executionButton.setAttribute("aria-pressed", String(!ouxState.activationsCollapsed));
-    executionButton.setAttribute("aria-label", label);
-    executionButton.title = label;
-    const text = executionButton.querySelector(".oux-toggle-label");
-    if (text) text.textContent = label;
+    ouxSetButtonLabel(executionButton, ouxText(ouxState.activationsCollapsed ? "showExecutions" : "hideExecutions"));
   }
   const tasksButton = $("ouxTasksToggle");
   if (tasksButton) {
-    const label = ouxText(ouxState.tasksCollapsed ? "showTasks" : "hideTasks");
     tasksButton.setAttribute("aria-pressed", String(!ouxState.tasksCollapsed));
-    tasksButton.setAttribute("aria-label", label);
-    tasksButton.title = label;
-    const text = tasksButton.querySelector(".oux-toggle-label");
-    if (text) text.textContent = label;
+    ouxSetButtonLabel(tasksButton, ouxText(ouxState.tasksCollapsed ? "showTasks" : "hideTasks"));
   }
   const focusButton = $("ouxFocusToggle");
   if (focusButton) {
-    const label = ouxText(ouxState.focusMode ? "exitFocus" : "focus");
     focusButton.setAttribute("aria-pressed", String(ouxState.focusMode));
-    focusButton.setAttribute("aria-label", label);
-    focusButton.title = label;
-    const text = focusButton.querySelector(".oux-toggle-label");
-    if (text) text.textContent = label;
+    ouxSetButtonLabel(focusButton, ouxText(ouxState.focusMode ? "exitFocus" : "focus"));
   }
   window.dispatchEvent(new CustomEvent("hermes-harness-ui-change", { detail: { kind: "layout" } }));
 }
 
 function ouxInstallWorkspaceControls() {
   const actions = document.querySelector(".worker-header .worker-actions");
-  if (!actions || $("ouxFocusToggle")) return;
+  if (actions && !$("ouxExecutionToggle")) {
+    const execution = ouxButton("ouxExecutionToggle", "▣", ouxText("showExecutions"));
+    execution.addEventListener("click", () => {
+      ouxState.activationsCollapsed = !ouxState.activationsCollapsed;
+      ouxWriteBool(OUX_KEYS.activationsCollapsed, ouxState.activationsCollapsed);
+      ouxApplyLayout();
+    });
+    const tasksButton = ouxButton("ouxTasksToggle", "◇", ouxText("hideTasks"));
+    tasksButton.addEventListener("click", () => {
+      ouxState.tasksCollapsed = !ouxState.tasksCollapsed;
+      ouxWriteBool(OUX_KEYS.tasksCollapsed, ouxState.tasksCollapsed);
+      ouxApplyLayout();
+    });
+    actions.prepend(tasksButton);
+    actions.prepend(execution);
+  }
 
-  const execution = ouxButton("ouxExecutionToggle", "▣", ouxText("showExecutions"));
-  execution.addEventListener("click", () => {
-    ouxState.activationsCollapsed = !ouxState.activationsCollapsed;
-    ouxWriteBool(OUX_KEYS.activationsCollapsed, ouxState.activationsCollapsed);
-    ouxApplyLayout();
-  });
-  const tasksButton = ouxButton("ouxTasksToggle", "◇", ouxText("hideTasks"));
-  tasksButton.addEventListener("click", () => {
-    ouxState.tasksCollapsed = !ouxState.tasksCollapsed;
-    ouxWriteBool(OUX_KEYS.tasksCollapsed, ouxState.tasksCollapsed);
-    ouxApplyLayout();
-  });
-  const focus = ouxButton("ouxFocusToggle", "⛶", ouxText("focus"));
-  focus.addEventListener("click", () => {
-    ouxState.focusMode = !ouxState.focusMode;
-    ouxWriteBool(OUX_KEYS.focusMode, ouxState.focusMode);
-    ouxApplyLayout();
-  });
-  actions.prepend(focus);
-  actions.prepend(tasksButton);
-  actions.prepend(execution);
+  // Focus is global rather than worker-local so a persisted focus preference can
+  // always be escaped after reload, even before a worker is selected.
+  const topbar = document.querySelector(".topbar .connection");
+  if (topbar && !$("ouxFocusToggle")) {
+    const focus = ouxButton("ouxFocusToggle", "⛶", ouxText("focus"));
+    focus.classList.add("oux-focus-toggle");
+    focus.addEventListener("click", () => {
+      ouxState.focusMode = !ouxState.focusMode;
+      ouxWriteBool(OUX_KEYS.focusMode, ouxState.focusMode);
+      ouxApplyLayout();
+    });
+    const refresh = $("refreshAllBtn");
+    topbar.insertBefore(focus, refresh || null);
+  }
 }
 
 function ouxInstallRenameControls() {
@@ -300,7 +307,7 @@ function ouxInstallRenameControls() {
     button.id = "ouxRenameSessionBtn";
     button.type = "button";
     button.title = ouxText("renameSession");
-    button.setAttribute("aria-label", ouxText("renameSession"));
+    button.setAttribute("aria-label", button.title);
     button.disabled = !state.sessionId;
     button.addEventListener("click", ouxOpenSessionRename);
     const archive = $("archiveSessionBtn");
@@ -313,13 +320,13 @@ function ouxInstallRenameControls() {
     button.id = "ouxRenameWorkerBtn";
     button.type = "button";
     button.title = ouxText("renameWorker");
-    button.setAttribute("aria-label", ouxText("renameWorker"));
+    button.setAttribute("aria-label", button.title);
     button.disabled = !state.workerId;
     button.addEventListener("click", () => {
       if (state.workerId && typeof openWorkerSettings === "function") openWorkerSettings();
     });
     const create = $("newWorkerBtn");
-    workerActions.insertBefore(button, create || workerActions.firstChild);
+    workerActions.insertBefore(button, create || sessionActions?.firstChild || null);
   }
   ouxUpdateRenameControls();
 }
@@ -366,9 +373,11 @@ function ouxEnsureSessionDialog() {
   form.append(label);
   const buttons = el("div", "dialog-actions");
   const cancel = el("button", "ghost", ouxText("cancel"));
+  cancel.id = "ouxSessionRenameCancel";
   cancel.type = "button";
   cancel.addEventListener("click", () => dialog.close());
   const save = el("button", "primary", ouxText("save"));
+  save.id = "ouxSessionRenameSave";
   save.type = "submit";
   buttons.append(cancel, save);
   form.append(buttons);
@@ -378,15 +387,26 @@ function ouxEnsureSessionDialog() {
   return dialog;
 }
 
+function ouxRefreshSessionDialogLocale(dialog) {
+  if (!dialog) return;
+  const heading = dialog.querySelector("h2");
+  const label = dialog.querySelector("label span");
+  if (heading) heading.textContent = ouxText("renameSession");
+  if (label) label.textContent = ouxText("sessionName");
+  const cancel = $("ouxSessionRenameCancel");
+  const save = $("ouxSessionRenameSave");
+  if (cancel) cancel.textContent = ouxText("cancel");
+  if (save) save.textContent = ouxText("save");
+}
+
 function ouxOpenSessionRename() {
   if (!state.sessionId) return;
   const session = state.sessions.find((item) => item.id === state.sessionId);
   if (!session) return;
   const dialog = ouxEnsureSessionDialog();
+  ouxRefreshSessionDialogLocale(dialog);
   const input = $("ouxSessionRenameInput");
   input.value = session.title || session.name || session.id;
-  dialog.querySelector("h2").textContent = ouxText("renameSession");
-  dialog.querySelector("label span").textContent = ouxText("sessionName");
   dialog.showModal();
   requestAnimationFrame(() => { input.focus(); input.select(); });
 }
@@ -502,6 +522,17 @@ function ouxInstallDictation() {
   });
 }
 
+function ouxRefreshDictationLocale() {
+  const button = $("ouxDictationBtn");
+  if (!button) return;
+  if (button.disabled) {
+    button.title = ouxText("dictationUnsupported");
+    button.setAttribute("aria-label", button.title);
+    return;
+  }
+  ouxSetListening(ouxState.listening);
+}
+
 function ouxActivationNode(activation) {
   const technical = [];
   if (activation.activation_id) technical.push(activation.activation_id);
@@ -552,8 +583,9 @@ function ouxWrapRenderers() {
 function ouxRefreshLocale() {
   ouxApplyLayout();
   ouxUpdateRenameControls();
-  const dictation = $("ouxDictationBtn");
-  if (dictation && !dictation.disabled) ouxSetListening(ouxState.listening);
+  ouxRefreshDictationLocale();
+  const dialog = $("ouxSessionRenameDialog");
+  if (dialog) ouxRefreshSessionDialogLocale(dialog);
 }
 
 function ouxInit() {

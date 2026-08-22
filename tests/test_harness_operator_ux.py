@@ -123,6 +123,10 @@ def test_focus_and_panel_preferences_are_browser_local_only():
     assert 'OUX_PREFIX + "focusMode"' in source
     assert "window.localStorage.setItem" in source
     assert "body.oux-focus-mode" in source
+    # A persisted focus preference must never trap the user with both rails
+    # hidden before a worker is selected: the exit control lives in the topbar.
+    assert 'document.querySelector(".topbar .connection")' in source
+    assert 'topbar.insertBefore(focus, refresh || null)' in source
 
 
 def test_dictation_only_edits_composer_and_never_submits_automatically():

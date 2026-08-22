@@ -27,12 +27,13 @@ _H61_WORKER_ROUTES: tuple[tuple[str, re.Pattern[str], str], ...] = (
     ("POST", re.compile(rf"^/sessions/(?P<session_id>{_SAFE_ID})/workers/(?P<worker_id>{_SAFE_ID})/restore$"), "/api/sessions/{session_id}/workers/{worker_id}/restore"),
 )
 
-# Hermes owns the model inventory and assignment persistence. Harness only
-# exposes these existing contracts through the authenticated BFF.
+# Hermes owns the model inventory, assignment persistence and speech-to-text.
+# Harness only exposes these existing contracts through the authenticated BFF.
 _H62_ROUTES: tuple[tuple[str, re.Pattern[str], str], ...] = (
     ("GET", re.compile(r"^/model-options$"), "/api/model/options"),
     ("GET", re.compile(r"^/model-auxiliary$"), "/api/model/auxiliary"),
     ("POST", re.compile(r"^/model-set$"), "/api/model/set"),
+    ("POST", re.compile(r"^/audio-transcribe$"), "/api/audio/transcribe"),
 )
 
 _H5_RECOVERY_BOOT = """s.onload=function(){
@@ -57,7 +58,12 @@ _H5_RECOVERY_BOOT = """s.onload=function(){
                   var houx=document.createElement('script');
                   houx.src='/harness-operator-ux.js';
                   houx.onload=function(){
-                    if(document.readyState!=='loading')document.dispatchEvent(new Event('DOMContentLoaded'));
+                    var hdict=document.createElement('script');
+                    hdict.src='/harness-dictation.js';
+                    hdict.onload=function(){
+                      if(document.readyState!=='loading')document.dispatchEvent(new Event('DOMContentLoaded'));
+                    };
+                    document.head.appendChild(hdict);
                   };
                   document.head.appendChild(houx);
                 };
@@ -226,6 +232,7 @@ def serve_harness_asset(handler, path: str) -> bool:
         "/harness-polish3.js": "harness-polish3.js",
         "/harness-models.js": "harness-models.js",
         "/harness-operator-ux.js": "harness-operator-ux.js",
+        "/harness-dictation.js": "harness-dictation.js",
     }
     if path in assets:
         return _serve_js_asset(handler, assets[path])

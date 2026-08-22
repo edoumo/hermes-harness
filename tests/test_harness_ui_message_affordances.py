@@ -95,7 +95,8 @@ def test_no_fork_regenerate_or_purge_added():
     harness = _static("harness.js")
     preferences = _static("harness-preferences.js")
 
-    assert "fork" not in harness.lower() or "fork" not in preferences.lower()
+    assert "fork" not in harness.lower()
+    assert "fork" not in preferences.lower()
     assert "regenerate" not in harness.lower()
     assert "method: \"DELETE\"" not in harness
     assert "purgeSessions" not in harness

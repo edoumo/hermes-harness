@@ -35,13 +35,6 @@ _H62_ROUTES: tuple[tuple[str, re.Pattern[str], str], ...] = (
     ("POST", re.compile(r"^/model-set$"), "/api/model/set"),
 )
 
-# The canonical Hermes Web/API contract already owns durable session titles.
-# Harness only provides a discoverable operator action through the BFF; no
-# parallel session metadata is created in Harness.
-_OPERATOR_ROUTES: tuple[tuple[str, re.Pattern[str], str], ...] = (
-    ("POST", re.compile(r"^/session-rename$"), "/api/session/rename"),
-)
-
 _H5_RECOVERY_BOOT = """s.onload=function(){
       var h4=document.createElement('script');
       h4.src='/harness-operations.js';
@@ -91,7 +84,7 @@ def resolve_upstream(method: str, browser_path: str) -> Optional[str]:
             match = _RECOVERY_ROUTE[1].fullmatch(suffix)
             if match:
                 return _RECOVERY_ROUTE[2].format(**match.groupdict())
-        for route_method, pattern, template in _H61_WORKER_ROUTES + _H62_ROUTES + _OPERATOR_ROUTES:
+        for route_method, pattern, template in _H61_WORKER_ROUTES + _H62_ROUTES:
             if route_method != method:
                 continue
             match = pattern.fullmatch(suffix)
@@ -101,12 +94,12 @@ def resolve_upstream(method: str, browser_path: str) -> Optional[str]:
 
 
 def _proxy_session_rename(handler, parsed) -> bool:
-    """Proxy only the title subset of Hermes' broader SessionRename model.
+    """Expose a rename-only adapter to Hermes' broader session PATCH model.
 
-    Hermes' canonical rename model can carry other session metadata on some
-    runtimes. Harness deliberately exposes a rename-only affordance here so a
-    caller cannot smuggle durable archive or other lifecycle mutations through
-    a UI route whose contract is only "rename".
+    Current Hermes owns session metadata at ``PATCH /api/sessions/{id}``. The
+    upstream SessionRename body can also archive/pin/mark read, but Harness
+    deliberately forwards only ``title`` so this discoverable rename action
+    cannot smuggle lifecycle mutations.
     """
     if parsed.query:
         j(handler, {"error": "Session rename does not accept query parameters"}, status=400)
@@ -131,12 +124,12 @@ def _proxy_session_rename(handler, parsed) -> bool:
         return True
 
     body = json.dumps(
-        {"session_id": session_id, "title": title.strip()},
+        {"title": title.strip()},
         separators=(",", ":"),
     ).encode("utf-8")
     try:
         request = urllib.request.Request(
-            f"{foundation._gateway_base_url()}/api/session/rename",
+            f"{foundation._gateway_base_url()}/api/sessions/{session_id}",
             data=body,
             headers={
                 "Authorization": "Bearer " + foundation._gateway_api_key(),
@@ -144,7 +137,7 @@ def _proxy_session_rename(handler, parsed) -> bool:
                 "Content-Type": "application/json",
                 "User-Agent": "Hermes-Harness/0.2",
             },
-            method="POST",
+            method="PATCH",
         )
         try:
             response = foundation._OPENER.open(request, timeout=foundation._NORMAL_TIMEOUT_SECONDS)

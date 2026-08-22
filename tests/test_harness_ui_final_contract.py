@@ -20,6 +20,7 @@ _BROWSER_RUNTIME_ASSETS = (
     "harness-polish3.js",
     "harness-models.js",
     "harness-operator-ux.js",
+    "harness-dictation.js",
 )
 _BROWSER_ASSETS = ("harness-locales.js", "harness-preferences.js") + _BROWSER_RUNTIME_ASSETS
 
@@ -65,6 +66,7 @@ def test_browser_localstorage_surfaces_are_namespaced_ui_preferences_only():
         "harness-task-recovery.js",
         "harness-polish2.js",
         "harness-models.js",
+        "harness-dictation.js",
     ):
         assert "localStorage" not in _asset_source(name)
     assert "localStorage" not in locales
@@ -116,6 +118,7 @@ def test_final_server_defaults_loopback_and_remote_bind_is_guarded_by_harness_ru
         "/harness-polish3.js",
         "/harness-models.js",
         "/harness-operator-ux.js",
+        "/harness-dictation.js",
     ):
         assert f'"{asset}"' in recovery_source
 
@@ -136,7 +139,7 @@ def test_final_bff_delegation_chain_preserves_h4_operations_on_standalone_founda
     assert not (ROOT / "server.py").exists()
 
 
-def test_final_script_boot_order_is_h3_h4_h5_recovery_h62_h63_models_operator_then_boot():
+def test_final_script_boot_order_is_h3_h4_h5_recovery_h62_h63_models_operator_dictation_then_boot():
     boot = recovery._H5_RECOVERY_BOOT
 
     h4 = boot.index("h4.src='/harness-operations.js'")
@@ -146,9 +149,10 @@ def test_final_script_boot_order_is_h3_h4_h5_recovery_h62_h63_models_operator_th
     h63 = boot.index("h63.src='/harness-polish3.js'")
     models = boot.index("hm.src='/harness-models.js'")
     operator = boot.index("houx.src='/harness-operator-ux.js'")
+    dictation = boot.index("hdict.src='/harness-dictation.js'")
     dom_boot = boot.index("document.dispatchEvent(new Event('DOMContentLoaded'))")
 
-    assert h4 < h5 < h5_recovery < h62 < h63 < models < operator < dom_boot
+    assert h4 < h5 < h5_recovery < h62 < h63 < models < operator < dictation < dom_boot
     assert boot.count("/harness-operations.js") == 1
     assert boot.count("/harness-tasks.js") == 1
     assert boot.count("/harness-task-recovery.js") == 1
@@ -156,6 +160,7 @@ def test_final_script_boot_order_is_h3_h4_h5_recovery_h62_h63_models_operator_th
     assert boot.count("/harness-polish3.js") == 1
     assert boot.count("/harness-models.js") == 1
     assert boot.count("/harness-operator-ux.js") == 1
+    assert boot.count("/harness-dictation.js") == 1
 
 
 def test_final_bff_surface_remains_allowlisted_and_non_destructive():
@@ -167,7 +172,7 @@ def test_final_bff_surface_remains_allowlisted_and_non_destructive():
     assert foundation_methods <= {"GET", "POST"}
     assert h5_methods <= {"GET", "POST"}
     assert h61_methods == {"POST"}
-    assert h62_methods == {"GET", "POST"}  # model-set is the sole H6 model write
+    assert h62_methods == {"GET", "POST"}
     assert recovery._RECOVERY_ROUTE[0] == "POST"
     combined = foundation_methods | h5_methods | h61_methods | h62_methods
     assert "DELETE" not in combined

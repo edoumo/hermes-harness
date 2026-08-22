@@ -71,11 +71,14 @@ def test_h63_locale_selector_has_flags_for_all_shipped_locales():
     assert "definition.label" in js
 
 
-def test_h63_single_stage_dag_is_left_aligned_and_cannot_scroll_horizontally():
+def test_h63_single_stage_dag_uses_full_width_task_group_and_no_horizontal_scroll():
     js = _static("harness-polish3.js")
 
     assert ".h5-dag-canvas.h63-single-stage{overflow-x:hidden!important" in js
-    assert "grid-template-columns:minmax(0,1fr)!important" in js
+    assert ".h5-dag-levels{display:block!important;width:100%!important" in js
+    assert ".h5-dag-level{display:block!important;width:100%!important" in js
+    assert ".h5-dag-group{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))" in js
+    assert "h63ApplySingleStageColumns" in js
     assert "min-width:0!important" in js
     assert 'canvas.classList.toggle("h63-single-stage", singleStage)' in js
     assert "canvas.scrollLeft = 0" in js

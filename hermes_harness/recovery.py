@@ -32,6 +32,13 @@ _H62_ROUTES: tuple[tuple[str, re.Pattern[str], str], ...] = (
     ("POST", re.compile(r"^/model-set$"), "/api/model/set"),
 )
 
+# The canonical Hermes Web/API contract already owns durable session titles.
+# Harness only provides a discoverable operator action through the BFF; no
+# parallel session metadata is created in Harness.
+_OPERATOR_ROUTES: tuple[tuple[str, re.Pattern[str], str], ...] = (
+    ("POST", re.compile(r"^/session-rename$"), "/api/session/rename"),
+)
+
 _H5_RECOVERY_BOOT = """s.onload=function(){
       var h4=document.createElement('script');
       h4.src='/harness-operations.js';
@@ -51,7 +58,12 @@ _H5_RECOVERY_BOOT = """s.onload=function(){
                 var hm=document.createElement('script');
                 hm.src='/harness-models.js';
                 hm.onload=function(){
-                  if(document.readyState!=='loading')document.dispatchEvent(new Event('DOMContentLoaded'));
+                  var houx=document.createElement('script');
+                  houx.src='/harness-operator-ux.js';
+                  houx.onload=function(){
+                    if(document.readyState!=='loading')document.dispatchEvent(new Event('DOMContentLoaded'));
+                  };
+                  document.head.appendChild(houx);
                 };
                 document.head.appendChild(hm);
               };
@@ -76,7 +88,7 @@ def resolve_upstream(method: str, browser_path: str) -> Optional[str]:
             match = _RECOVERY_ROUTE[1].fullmatch(suffix)
             if match:
                 return _RECOVERY_ROUTE[2].format(**match.groupdict())
-        for route_method, pattern, template in _H61_WORKER_ROUTES + _H62_ROUTES:
+        for route_method, pattern, template in _H61_WORKER_ROUTES + _H62_ROUTES + _OPERATOR_ROUTES:
             if route_method != method:
                 continue
             match = pattern.fullmatch(suffix)
@@ -151,6 +163,7 @@ def serve_harness_asset(handler, path: str) -> bool:
         "/harness-polish2.js": "harness-polish2.js",
         "/harness-polish3.js": "harness-polish3.js",
         "/harness-models.js": "harness-models.js",
+        "/harness-operator-ux.js": "harness-operator-ux.js",
     }
     if path in assets:
         return _serve_js_asset(handler, assets[path])

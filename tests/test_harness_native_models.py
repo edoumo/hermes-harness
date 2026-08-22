@@ -58,6 +58,21 @@ def test_models_panel_uses_hermes_as_single_source_of_truth():
         assert token not in models
 
 
+def test_auxiliary_404_cannot_blank_independent_main_model_controls():
+    models = _static("harness-models.js")
+    start = models.index("async function loadConfiguration")
+    end = models.index("async function openModels", start)
+    block = models[start:end]
+
+    assert 'options = await api(`/api/harness/model-options${suffix}`)' in block
+    assert 'panel.auxiliary = await api("/api/harness/model-auxiliary")' in block
+    assert "panel.auxiliaryAvailable = false" in block
+    assert "renderMain();" in block
+    assert "renderAuxiliary();" in block
+    assert "Promise.all" not in block
+    assert "auxiliaryUnavailable" in models
+
+
 def test_models_asset_is_loaded_after_existing_h6_stack():
     recovery_source = (ROOT / "hermes_harness" / "recovery.py").read_text(encoding="utf-8")
 

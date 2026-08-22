@@ -39,7 +39,7 @@ def test_completed_single_stage_task_history_can_be_hidden_without_deletion():
     source = _read(POLISH3)
     assert 'H63_HIDE_COMPLETED_KEY = "hermesHarness.ui.hideCompletedTasks"' in source
     assert 'node.dataset.h5Status = String(task?.status || "")' in source
-    assert '.h63-single-stage.h63-hide-completed .h5-task-node[data-h5-status="completed"]' in source
+    assert '.h5-dag-canvas.h63-single-stage.h63-hide-completed .h5-task-node[data-h5-status="completed"]' in source
     assert "h63CompletedTasksToggle" in source
     assert "h63WriteHideCompleted" in source
     assert "/delete" not in source

@@ -101,7 +101,8 @@ def test_dictation_only_edits_composer_and_never_submits_automatically():
     dictation = source[start:end]
     assert "api(" not in dictation
     assert "fetch(" not in dictation
-    assert "sendMessage" not in dictation
+    assert "sendMessage(" not in dictation
+    assert "queueMessage(" not in dictation
     assert "sendMessageBtn" in dictation  # placement only: microphone before Send
 
 

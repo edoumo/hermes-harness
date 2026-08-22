@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from hermes_harness import bff as foundation
 from hermes_harness import recovery
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,6 +44,31 @@ class _JsonHandler:
 
     def end_headers(self):
         return None
+
+
+class _FakeResponse:
+    status = 200
+    headers = {"Content-Type": "application/json"}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self, _limit=-1):
+        return b'{"ok":true}'
+
+
+class _CapturingOpener:
+    def __init__(self):
+        self.request = None
+        self.timeout = None
+
+    def open(self, request, timeout=None):
+        self.request = request
+        self.timeout = timeout
+        return _FakeResponse()
 
 
 def test_operator_asset_is_booted_after_models_and_served():
@@ -78,6 +104,28 @@ def test_session_rename_cannot_smuggle_archive_or_lifecycle_fields():
     source = Path(recovery.__file__).read_text(encoding="utf-8")
     assert 'set(payload) - {"session_id", "title"}' in source
     assert '{"session_id": session_id, "title": title.strip()}' in source
+
+
+def test_session_rename_proxies_only_sanitized_title_payload(monkeypatch):
+    opener = _CapturingOpener()
+    monkeypatch.setattr(foundation, "_OPENER", opener)
+    monkeypatch.setattr(foundation, "_gateway_base_url", lambda environ=None: "http://hermes.test")
+    monkeypatch.setattr(foundation, "_gateway_api_key", lambda environ=None: "test-key")
+
+    handler = _JsonHandler({"session_id": "session-uat", "title": "  Better name  "})
+    parsed = urllib.parse.urlparse("/api/harness/session-rename")
+
+    handled = recovery._proxy_session_rename(handler, parsed)
+
+    assert handled is True
+    assert handler.status == 200
+    assert opener.request is not None
+    assert opener.request.full_url == "http://hermes.test/api/session/rename"
+    assert json.loads(opener.request.data.decode("utf-8")) == {
+        "session_id": "session-uat",
+        "title": "Better name",
+    }
+    assert opener.request.get_header("Authorization") == "Bearer test-key"
 
 
 def test_worker_rename_is_discoverable_without_duplicate_worker_api():

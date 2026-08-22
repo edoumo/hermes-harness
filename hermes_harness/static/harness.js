@@ -309,23 +309,6 @@ function fillModelOptions() {
   for (const model of state.models) datalist.append(new Option(model, model));
 }
 
-function eventNode(kind, timestamp, body, stateName) {
-  const item = el("article", "event");
-  const head = el("div", "event-head");
-  head.append(el("span", "", kind));
-  head.append(el("span", stateName ? `state ${String(stateName).toLowerCase()}` : "", stateName ? statusLabel(stateName) : formatTime(timestamp)));
-  item.append(head);
-  item.append(el("div", "event-body", body || ""));
-  return item;
-}
-
-function formatTime(value) {
-  if (!value) return "";
-  const num = Number(value);
-  const date = Number.isFinite(num) ? new Date(num * 1000) : new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString(ui.locale?.() || undefined);
-}
-
 function renderMessages(items) {
   const root = $("messageList");
   root.replaceChildren();

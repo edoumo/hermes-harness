@@ -18,6 +18,7 @@
       saveMain: "Save main model",
       auxiliary: "Specialized models",
       auxiliaryHelp: "Each function inherits the main model by default. Override only where a dedicated model is useful.",
+      auxiliaryUnavailable: "Specialized model slots are not exposed by this Hermes runtime yet. The main model remains fully configurable.",
       inherit: "Use main model",
       save: "Save",
       resetAll: "Reset all to main model",
@@ -41,6 +42,7 @@
       saveMain: "Enregistrer le modèle principal",
       auxiliary: "Modèles spécialisés",
       auxiliaryHelp: "Chaque fonction hérite par défaut du modèle principal. Ne définissez un modèle spécifique que lorsque c’est utile.",
+      auxiliaryUnavailable: "Les emplacements de modèles spécialisés ne sont pas encore exposés par cette version de Hermes. Le modèle principal reste entièrement configurable.",
       inherit: "Utiliser le modèle principal",
       save: "Enregistrer",
       resetAll: "Tout réinitialiser sur le modèle principal",
@@ -111,6 +113,7 @@
       #modelsDialog .hm-aux-row{display:grid;grid-template-columns:minmax(150px,.9fr) minmax(160px,.9fr) minmax(220px,1.3fr) auto;gap:8px;align-items:end;padding:10px;border-radius:10px;background:color-mix(in srgb,currentColor 4%,transparent)}
       #modelsDialog .hm-task{align-self:center;font-weight:600}
       #modelsDialog .hm-status{min-height:1.2em;margin:0;opacity:.8}
+      #modelsDialog .hm-aux-unavailable{padding:10px;border:1px dashed var(--border-color,#2f3642);border-radius:10px;opacity:.8}
       @media(max-width:760px){#modelsDialog .hm-grid,#modelsDialog .hm-aux-row{grid-template-columns:1fr}#modelsDialog .hm-task{margin-bottom:2px}}
     `;
     document.head.appendChild(style);
@@ -187,11 +190,13 @@
       const node = document.getElementById(id);
       if (node) node.textContent = tx(key);
     }
+    if (!panel.auxiliaryAvailable) renderAuxiliary();
   }
 
   const panel = {
     options: null,
     auxiliary: null,
+    auxiliaryAvailable: false,
     providers: [],
   };
 
@@ -234,15 +239,19 @@
     select.value = value || models[0] || "";
   }
 
+  function mainAssignment() {
+    return panel.auxiliary?.main || { provider: panel.options?.provider || "", model: panel.options?.model || "" };
+  }
+
   function fillMainModels() {
     const provider = document.getElementById("hmMainProvider").value;
-    const current = panel.auxiliary?.main || {};
+    const current = mainAssignment();
     const desired = provider === current.provider ? current.model : "";
     fillModelSelect(document.getElementById("hmMainModel"), provider, desired);
   }
 
   function renderMain() {
-    const main = panel.auxiliary?.main || {};
+    const main = mainAssignment();
     fillProviderSelect(document.getElementById("hmMainProvider"), main.provider || panel.options?.provider || "", false);
     fillModelSelect(
       document.getElementById("hmMainModel"),
@@ -253,7 +262,18 @@
 
   function renderAuxiliary() {
     const root = document.getElementById("hmAuxList");
+    const reset = document.getElementById("hmResetAux");
+    if (!root || !reset) return;
     root.replaceChildren();
+    if (!panel.auxiliaryAvailable) {
+      const note = document.createElement("div");
+      note.className = "hm-aux-unavailable";
+      note.textContent = tx("auxiliaryUnavailable");
+      root.append(note);
+      reset.disabled = true;
+      return;
+    }
+    reset.disabled = false;
     const tasks = Array.isArray(panel.auxiliary?.tasks) ? panel.auxiliary.tasks : [];
     for (const task of tasks) {
       const row = document.createElement("div");
@@ -275,7 +295,6 @@
       const model = document.createElement("select");
       fillModelSelect(model, provider.value, task.model || "");
       modelLabel.append(modelText, model);
-
       provider.addEventListener("change", () => fillModelSelect(model, provider.value, ""));
 
       const save = document.createElement("button");
@@ -299,7 +318,6 @@
           save.disabled = false;
         }
       });
-
       row.append(title, providerLabel, modelLabel, save);
       root.appendChild(row);
     }
@@ -346,6 +364,7 @@
   }
 
   async function resetAux() {
+    if (!panel.auxiliaryAvailable) return;
     if (!window.confirm(tx("confirmReset"))) return;
     const button = document.getElementById("hmResetAux");
     try {
@@ -363,20 +382,34 @@
   async function loadConfiguration(refreshCatalog = false) {
     setStatus(tx("loading"));
     const suffix = refreshCatalog ? "?refresh=true" : "";
+    let options;
     try {
-      const [options, auxiliary] = await Promise.all([
-        api(`/api/harness/model-options${suffix}`),
-        api("/api/harness/model-auxiliary"),
-      ]);
-      panel.options = options;
-      panel.auxiliary = auxiliary;
-      panel.providers = normalizeProviders(options);
-      renderMain();
-      renderAuxiliary();
-      setStatus("");
+      options = await api(`/api/harness/model-options${suffix}`);
     } catch (error) {
+      panel.options = null;
+      panel.auxiliary = null;
+      panel.auxiliaryAvailable = false;
+      panel.providers = [];
+      renderAuxiliary();
       setStatus(`${tx("unavailable")} ${error.message || error}`, true);
+      return;
     }
+
+    panel.options = options;
+    panel.providers = normalizeProviders(options);
+    try {
+      panel.auxiliary = await api("/api/harness/model-auxiliary");
+      panel.auxiliaryAvailable = true;
+    } catch (_) {
+      // Auxiliary slots are optional from the panel's point of view. Older
+      // Hermes runtimes may not expose /api/model/auxiliary yet; never let
+      // that 404 make the independently available main-model controls unusable.
+      panel.auxiliary = null;
+      panel.auxiliaryAvailable = false;
+    }
+    renderMain();
+    renderAuxiliary();
+    setStatus("");
   }
 
   async function openModels() {

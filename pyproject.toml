@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hermes-harness"
+version = "0.1.0"
+description = "Standalone control plane and UI for Hermes Durable Workers."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "edoumo" }]
+keywords = ["hermes", "durable-workers", "harness", "control-plane"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: User Interfaces",
+]
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+hermes-harness = "hermes_harness.server:main"
+
+[tool.setuptools]
+packages = ["hermes_harness"]
+
+[tool.setuptools.package-data]
+hermes_harness = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

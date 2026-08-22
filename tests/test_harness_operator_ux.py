@@ -6,8 +6,11 @@ best-effort browser dictation. Hermes remains the source of truth.
 """
 from __future__ import annotations
 
+import io
+import json
 import shutil
 import subprocess
+import urllib.parse
 from pathlib import Path
 
 import pytest
@@ -21,6 +24,25 @@ OPERATOR_JS = STATIC / "harness-operator-ux.js"
 
 def _operator_source() -> str:
     return OPERATOR_JS.read_text(encoding="utf-8")
+
+
+class _JsonHandler:
+    def __init__(self, payload: dict):
+        raw = json.dumps(payload).encode("utf-8")
+        self.headers = {"Content-Length": str(len(raw))}
+        self.rfile = io.BytesIO(raw)
+        self.wfile = io.BytesIO()
+        self.status = None
+        self.response_headers: list[tuple[str, str]] = []
+
+    def send_response(self, status):
+        self.status = int(status)
+
+    def send_header(self, name, value):
+        self.response_headers.append((str(name), str(value)))
+
+    def end_headers(self):
+        return None
 
 
 def test_operator_asset_is_booted_after_models_and_served():
@@ -40,6 +62,22 @@ def test_session_rename_uses_canonical_hermes_contract_through_bff():
     assert 'api("/api/harness/session-rename"' in source
     assert "session_id: sid, title" in source
     assert "safeId(state.sessionId)" in source
+
+
+def test_session_rename_cannot_smuggle_archive_or_lifecycle_fields():
+    handler = _JsonHandler({"session_id": "session-uat", "title": "Renamed", "archived": True})
+    parsed = urllib.parse.urlparse("/api/harness/session-rename")
+
+    handled = recovery.handle_harness_request(handler, parsed, method="POST")
+
+    assert handled is True
+    assert handler.status == 400
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert "accepts only session_id and title" in payload["error"]
+
+    source = Path(recovery.__file__).read_text(encoding="utf-8")
+    assert 'set(payload) - {"session_id", "title"}' in source
+    assert '{"session_id": session_id, "title": title.strip()}' in source
 
 
 def test_worker_rename_is_discoverable_without_duplicate_worker_api():

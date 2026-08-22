@@ -28,6 +28,108 @@ const el = (tag, className, text) => {
   return node;
 };
 
+function formatTime(value) {
+  if (!value) return "";
+  const num = Number(value);
+  const date = Number.isFinite(num) ? new Date(num * 1000) : new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString(ui.locale?.() || undefined);
+}
+
+// Canonical execution duration, seconds. Only when the same activation owns
+// both bounds: started_at and completed_at are both epoch seconds from the
+// Hermes durable-worker store. Never derive a duration from client clocks.
+function canonicalDurationSeconds(activation) {
+  if (!activation) return null;
+  const start = Number(activation.started_at);
+  const end = Number(activation.completed_at);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  if (start <= 0 || end <= 0 || end < start) return null;
+  return Math.round((end - start) * 10) / 10;
+}
+
+function formatDuration(seconds) {
+  if (seconds === null || seconds === undefined || !Number.isFinite(Number(seconds))) return "";
+  const total = Math.max(0, Math.round(Number(seconds)));
+  if (total < 60) return `${total}s`;
+  const minutes = Math.floor(total / 60);
+  const rest = total % 60;
+  if (minutes < 60) return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const restMinutes = minutes % 60;
+  return restMinutes ? `${hours}h ${restMinutes}m` : `${hours}h`;
+}
+
+async function copyText(text) {
+  const value = String(text ?? "");
+  if (!value) return false;
+  // 1) Modern Clipboard API when available (requires secure context).
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch (_) {
+    // Fall through to the user-gesture compatible fallback below.
+  }
+  // 2) HTTP/LAN fallback: temporary textarea + selection + execCommand.
+  //    Works without a secure context and without a backend call.
+  try {
+    const area = document.createElement("textarea");
+    area.value = value;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.top = "0";
+    area.style.left = "0";
+    area.style.opacity = "0";
+    area.style.pointerEvents = "none";
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    area.setSelectionRange(0, area.value.length);
+    const ok = document.execCommand && document.execCommand("copy");
+    area.remove();
+    return ok === true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function copyButton(text) {
+  const button = el("button", "copy-btn", t("copy"));
+  button.type = "button";
+  button.setAttribute("aria-label", t("copy"));
+  button.title = t("copy");
+  button.addEventListener("click", async () => {
+    const ok = await copyText(text);
+    showToast(ok ? t("copied") : t("copyFailed"), !ok);
+    if (ok) button.textContent = t("copied");
+    setTimeout(() => { button.textContent = t("copy"); }, 1800);
+  });
+  return button;
+}
+
+function eventNode(kind, timestamp, body, stateName, copyableText, extraMeta) {
+  const item = el("article", "event");
+  const head = el("div", "event-head");
+  head.append(el("span", "event-kind", kind));
+  const meta = el("span", "event-meta");
+  if (stateName) {
+    meta.append(el("span", `state ${String(stateName).toLowerCase()}`, statusLabel(stateName)));
+  }
+  if (extraMeta) meta.append(el("span", "event-duration", extraMeta));
+  const timeText = formatTime(timestamp);
+  if (timeText) meta.append(el("time", "event-time", timeText));
+  head.append(meta);
+  item.append(head);
+  item.append(el("div", "event-body", body || ""));
+  if (copyableText !== undefined && copyableText !== null) {
+    const footer = el("div", "event-footer");
+    footer.append(copyButton(copyableText));
+    item.append(footer);
+  }
+  return item;
+}
+
 function showToast(message, isError = false) {
   const toast = $("toast");
   toast.textContent = String(message || "Done");
@@ -230,7 +332,7 @@ function renderMessages(items) {
   if (!items.length) return root.append(el("div", "muted", t("noMessages")));
   for (const message of items) {
     const direction = message.direction === "worker" ? "WORKER" : "PARENT";
-    root.append(eventNode(direction, message.created_at, message.content, message.state));
+    root.append(eventNode(direction, message.created_at, message.content, message.state, message.content));
   }
 }
 
@@ -243,7 +345,10 @@ function renderActivations(items) {
     if (activation.subagent_id) bits.push(`subagent ${activation.subagent_id}`);
     if (activation.summary) bits.push(activation.summary);
     if (activation.error) bits.push(`Error: ${activation.error}`);
-    root.append(eventNode("ACTIVATION", activation.started_at, bits.join("\n"), activation.state));
+    const duration = canonicalDurationSeconds(activation);
+    const meta = [];
+    if (duration !== null) meta.push(formatDuration(duration));
+    root.append(eventNode("ACTIVATION", activation.started_at, bits.join("\n"), activation.state, bits.join("\n"), meta.length ? meta.join(" · ") : null));
   }
 }
 

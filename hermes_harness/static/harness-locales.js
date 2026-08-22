@@ -22,6 +22,9 @@
     idempotencyPlaceholder: "Optional idempotency key",
     queueMessage: "Queue message",
     boundedHistory: "Bounded history",
+    copy: "Copy",
+    copied: "Copied",
+    copyFailed: "Copy failed",
     messages: "Messages",
     runtimeInstances: "Runtime instances",
     activations: "Activations",
@@ -136,6 +139,7 @@
     noDescription: "No description",
     readyDescription: "Ready",
     removeDependency: "Remove dependency",
+    copy: "Copy", copied: "Copied", copyFailed: "Copy failed",
   };
 
   const fr = {
@@ -175,6 +179,7 @@
     cancelActivationConfirm: "Annuler l’activation {id} ? Le message durable ne sera remis en file qu’après confirmation de l’arrêt du child.",
     cancellationWaiting: "Annulation demandée ; attente de l’état terminal du child", cancellationAcknowledged: "Annulation prise en compte", showArchived: "Afficher les archivés",
     archive: "Archiver", restore: "Restaurer", noDescription: "Aucune description", readyDescription: "Prête", removeDependency: "Supprimer la dépendance",
+    copy: "Copier", copied: "Copié", copyFailed: "Échec de la copie",
   };
 
   const es = {
@@ -206,6 +211,7 @@
     graphSummary: "{ready} listas · {blocked} bloqueadas · {running} en curso · {done} completadas", retryFailed: "Reintentar tras error",
     cancelActivation: "Cancelar activación", cancellationRequested: "Cancelación solicitada", archive: "Archivar", restore: "Restaurar", noDescription: "Sin descripción",
     readyDescription: "Lista", removeDependency: "Eliminar dependencia",
+    copy: "Copiar", copied: "Copiado", copyFailed: "Error al copiar",
   };
 
   const pt = {
@@ -237,6 +243,7 @@
     graphSummary: "{ready} prontas · {blocked} bloqueadas · {running} em curso · {done} concluídas", retryFailed: "Tentar novamente após falha",
     cancelActivation: "Cancelar ativação", cancellationRequested: "Cancelamento solicitado", archive: "Arquivar", restore: "Restaurar", noDescription: "Sem descrição",
     readyDescription: "Pronta", removeDependency: "Remover dependência",
+    copy: "Copiar", copied: "Copiado", copyFailed: "Falha ao copiar",
   };
 
   const de = {
@@ -255,6 +262,7 @@
     stage: "Stufe {number}", ready: "BEREIT", blocked: "BLOCKIERT", running: "LÄUFT", completed: "ABGESCHLOSSEN", failed: "FEHLER", cancelled: "ABGEBROCHEN",
     dormant: "RUHEND", disabled: "ARCHIVIERT", edit: "Bearbeiten", dispatch: "Starten", add: "Hinzufügen", none: "keine", worker: "Worker",
     archive: "Archivieren", restore: "Wiederherstellen", themeLight: "Helles Design verwenden", themeDark: "Dunkles Design verwenden",
+    copy: "Kopieren", copied: "Kopiert", copyFailed: "Kopieren fehlgeschlagen",
   };
 
   const it = {
@@ -273,6 +281,7 @@
     stage: "Fase {number}", ready: "PRONTA", blocked: "BLOCCATA", running: "IN CORSO", completed: "COMPLETATA", failed: "ERRORE", cancelled: "ANNULLATA",
     dormant: "IN ATTESA", disabled: "ARCHIVIATO", edit: "Modifica", dispatch: "Avvia", add: "Aggiungi", none: "nessuna", worker: "Worker",
     archive: "Archivia", restore: "Ripristina", themeLight: "Usa tema chiaro", themeDark: "Usa tema scuro",
+    copy: "Copia", copied: "Copiato", copyFailed: "Copia non riuscita",
   };
 
   const withFallback = (messages) => Object.freeze({ ...en, ...messages });

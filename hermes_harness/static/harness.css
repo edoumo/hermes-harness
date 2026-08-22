@@ -163,6 +163,12 @@ textarea:focus, input:focus, select:focus { border-color: #285f86; box-shadow: 0
 .timeline { display: grid; gap: 9px; max-height: 470px; overflow: auto; padding: 12px 2px 2px; }
 .event { border: 1px solid var(--border); background: var(--event); border-radius: 10px; padding: 10px; }
 .event-head { display: flex; justify-content: space-between; gap: 10px; color: var(--soft); font-size: 9px; margin-bottom: 7px; }
+.event-meta { display: inline-flex; gap: 8px; align-items: center; }
+.event-time { white-space: nowrap; }
+.event-duration { white-space: nowrap; opacity: .8; }
+.event-footer { display: flex; justify-content: flex-end; margin-top: 6px; }
+.copy-btn { font: inherit; font-size: 9px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--soft); cursor: pointer; }
+.copy-btn:hover, .copy-btn:focus-visible { color: var(--text); border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 1px; }
 .event-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; line-height: 1.52; color: var(--text); opacity: .88; }
 .compact .event-body { font-size: 10px; }
 .tasks-card { width: 100%; min-width: 0; }

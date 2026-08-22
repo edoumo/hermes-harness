@@ -80,8 +80,10 @@ def test_operator_asset_is_booted_after_models_and_served():
     assert '"/harness-operator-ux.js": "harness-operator-ux.js"' in source
 
 
-def test_session_rename_uses_canonical_hermes_contract_through_bff():
-    assert recovery.resolve_upstream("POST", "/api/harness/session-rename") == "/api/session/rename"
+def test_session_rename_uses_dedicated_sanitizing_bff_adapter():
+    # Session rename needs the session id from the validated browser body, so it
+    # is handled by the dedicated adapter instead of the generic path resolver.
+    assert recovery.resolve_upstream("POST", "/api/harness/session-rename") is None
     assert recovery.resolve_upstream("GET", "/api/harness/session-rename") is None
 
     source = _operator_source()
@@ -103,10 +105,11 @@ def test_session_rename_cannot_smuggle_archive_or_lifecycle_fields():
 
     source = Path(recovery.__file__).read_text(encoding="utf-8")
     assert 'set(payload) - {"session_id", "title"}' in source
-    assert '{"session_id": session_id, "title": title.strip()}' in source
+    assert '{"title": title.strip()}' in source
+    assert '"archived"' not in source[source.index("def _proxy_session_rename"):source.index("def handle_harness_request")]
 
 
-def test_session_rename_proxies_only_sanitized_title_payload(monkeypatch):
+def test_session_rename_proxies_sanitized_title_to_current_hermes_patch(monkeypatch):
     opener = _CapturingOpener()
     monkeypatch.setattr(foundation, "_OPENER", opener)
     monkeypatch.setattr(foundation, "_gateway_base_url", lambda environ=None: "http://hermes.test")
@@ -120,11 +123,9 @@ def test_session_rename_proxies_only_sanitized_title_payload(monkeypatch):
     assert handled is True
     assert handler.status == 200
     assert opener.request is not None
-    assert opener.request.full_url == "http://hermes.test/api/session/rename"
-    assert json.loads(opener.request.data.decode("utf-8")) == {
-        "session_id": "session-uat",
-        "title": "Better name",
-    }
+    assert opener.request.full_url == "http://hermes.test/api/sessions/session-uat"
+    assert opener.request.method == "PATCH"
+    assert json.loads(opener.request.data.decode("utf-8")) == {"title": "Better name"}
     assert opener.request.get_header("Authorization") == "Bearer test-key"
 
 

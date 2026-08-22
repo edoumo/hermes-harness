@@ -27,21 +27,29 @@ def test_operator_layer_has_h63_watchdog_fallback():
     assert "window.setTimeout" in source
 
 
-def test_single_stage_tasks_use_responsive_multi_column_layout():
+def test_single_stage_tasks_grid_the_actual_task_group_at_full_width():
     source = _read(POLISH3)
-    assert ".h5-dag-canvas.h63-single-stage .h5-dag-level{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))" in source
-    assert "@media(max-width:1500px)" in source
-    assert "repeat(2,minmax(0,1fr))" in source
-    assert "@media(max-width:900px)" in source
+    # h5RenderDag puts task cards inside .h5-dag-group. Applying columns to the
+    # parent level creates one narrow group plus dead space, which Ed caught in
+    # real UAT. The group itself must own the responsive grid.
+    assert ".h5-dag-canvas.h63-single-stage .h5-dag-level{display:block!important;width:100%!important" in source
+    assert ".h5-dag-canvas.h63-single-stage .h5-dag-group{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))" in source
+    assert "function h63ApplySingleStageColumns" in source
+    assert 'group.style.setProperty("grid-template-columns"' in source
+    assert "Math.min(responsiveCap, visibleTasks || 1)" in source
+    assert ".h5-dag-level{display:grid!important;grid-template-columns:repeat(3" not in source
 
 
-def test_completed_single_stage_task_history_can_be_hidden_without_deletion():
+def test_completed_single_stage_task_history_hides_existing_and_future_cards():
     source = _read(POLISH3)
     assert 'H63_HIDE_COMPLETED_KEY = "hermesHarness.ui.hideCompletedTasks"' in source
-    assert 'node.dataset.h5Status = String(task?.status || "")' in source
-    assert '.h5-dag-canvas.h63-single-stage.h63-hide-completed .h5-task-node[data-h5-status="completed"]' in source
+    assert "function h63SyncRenderedTaskStatus" in source
+    assert 'node.dataset.h5Status = String(task.status || "")' in source
+    assert 'node.hidden = hidden && node.dataset.h5Status === "completed"' in source
+    assert ".h5-task-node[hidden]{display:none!important}" in source
     assert "h63CompletedTasksToggle" in source
-    assert "h63WriteHideCompleted" in source
+    assert "h63WriteHideCompleted(!h63ReadHideCompleted())" in source
+    assert "subtree: true" in source
     assert "/delete" not in source
     assert "/purge" not in source
 
